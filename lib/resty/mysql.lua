@@ -10,6 +10,7 @@ local strbyte = string.byte
 local strchar = string.char
 local strfind = string.find
 local strrep = string.rep
+local strlower = string.lower
 local null = ngx.null
 local band = bit.band
 local bxor = bit.bxor
@@ -49,6 +50,45 @@ local mt = { __index = _M }
 -- mysql field value type converters
 local converters = {}
 
+local DEFAULT_CHAESET = "latin1"
+-- mysql charset mapping table
+local charset_mapping = {["big5"] = 1, 
+    ["dec8"] = 3, 
+    ["cp850"] = 4, 
+    ["hp8"] = 6, 
+    ["koi8r"] = 7, 
+    ["latin1"] = 8, 
+    ["latin2"] = 9, 
+    ["swe7"] = 10, 
+    ["ascii"] = 11, 
+    ["ujis"] = 12, 
+    ["sjis"] = 13, 
+    ["hebrew"] = 16, 
+    ["tis620"] = 18, 
+    ["euckr"] = 19, 
+    ["koi8u"] = 22, 
+    ["gb2312"] = 24, 
+    ["greek"] = 25, 
+    ["cp1250"] = 26, 
+    ["gbk"] = 28, 
+    ["latin5"] = 30, 
+    ["armscii8"] = 32, 
+    ["utf8"] = 33, 
+    ["ucs2"] = 35, 
+    ["cp866"] = 36, 
+    ["keybcs2"] = 37, 
+    ["macce"] = 38, 
+    ["macroman"] = 39, 
+    ["cp852"] = 40, 
+    ["latin7"] = 41, 
+    ["cp1251"] = 51, 
+    ["cp1256"] = 57, 
+    ["cp1257"] = 59, 
+    ["binary"] = 63, 
+    ["geostd8"] = 92, 
+    ["cp932"] = 95, 
+    ["eucjpms"] = 97}
+
 for i = 0x01, 0x05 do
     -- tiny, short, long, float, double
     converters[i] = tonumber
@@ -57,6 +97,11 @@ end
 converters[0x09] = tonumber  -- int24
 converters[0x0d] = tonumber  -- year
 converters[0xf6] = tonumber  -- newdecimal
+
+local function _get_charset_index(charset)
+    local c = strlower(charset)
+    return (charset_mapping[c] or charset_mapping[DEFAULT_CHAESET])
+end
 
 
 local function _get_byte2(data, i)
@@ -479,7 +524,8 @@ function connect(self, opts)
     local ok, err
 
     self.compact = opts.compact_arrays
-
+    self._charset = opts.charset or "" -- connect charset
+    
     local database = opts.database or ""
     local user = opts.user or ""
 
@@ -597,11 +643,12 @@ function connect(self, opts)
     local client_flags = 260047;
 
     --print("token: ", _dump(token))
+    local charset_index = _get_charset_index(self._charset) -- get charset index from charset_mapping table
 
     local req = {
         _set_byte4(client_flags),
         _set_byte4(self._max_packet_size),
-        "\0", -- TODO: add support for charset encoding
+        _set_byte2(charset_index), 
         strrep("\0", 23),
         _to_cstring(user),
         _to_binary_coded_string(token),
