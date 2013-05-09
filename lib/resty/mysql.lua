@@ -648,7 +648,7 @@ function connect(self, opts)
     local req = {
         _set_byte4(client_flags),
         _set_byte4(self._max_packet_size),
-        _set_byte2(charset_index), 
+        strbyte(charset_index), 
         strrep("\0", 23),
         _to_cstring(user),
         _to_binary_coded_string(token),
